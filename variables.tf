@@ -15,5 +15,5 @@ variable "cluster_name" {
 }
 
 variable "ssh_key_name" {
-  description = "SSH key name for EC2 instances"
+  default = "ken.pem"
 }

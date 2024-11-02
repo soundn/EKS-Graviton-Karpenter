@@ -1,5 +1,16 @@
+resource "random_string" "suffix" {
+  length  = 8
+  special = false
+  upper   = false
+}
+
+locals {
+  name_prefix = "ken"
+  name_suffix = random_string.suffix.result
+}
+
 resource "aws_iam_role" "cluster_role" {
-  name = "ken-cluster-role"
+  name = "${local.name_prefix}-cluster-role-${local.name_suffix}"
 
   assume_role_policy = jsonencode({
     Version = "2012-10-17"
@@ -21,7 +32,7 @@ resource "aws_iam_role_policy_attachment" "cluster_role_policy" {
 }
 
 resource "aws_iam_role" "node_group_role" {
-  name = "ken-node-group-role"
+  name = "${local.name_prefix}-node-group-role-${local.name_suffix}"
 
   assume_role_policy = jsonencode({
     Version = "2012-10-17"
