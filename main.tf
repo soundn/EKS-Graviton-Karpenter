@@ -1,4 +1,3 @@
-
 module "vpc" {
   source = "./modules/vpc"
   
@@ -21,18 +20,15 @@ module "eks" {
   ssh_key_name       = var.ssh_key_name
 }
 
-# Karpenter module
 module "karpenter" {
   source = "./modules/karpenter"
 
   cluster_name       = var.cluster_name
   cluster_endpoint   = module.eks.cluster_endpoint
-  cluster_version    = module.eks.cluster_version
   vpc_id            = module.vpc.vpc_id
   subnet_ids        = module.vpc.subnet_ids
   eks_cluster_id    = module.eks.cluster_id
-  
-  # IAM role configurations will be handled inside the module
+  cluster_version   = module.eks.cluster_version
 }
 
 # Node Template for Karpenter
@@ -51,7 +47,6 @@ resource "aws_eks_node_group" "karpenter" {
   # Enable both AMD64 and ARM64 instances
   ami_type = "AL2_x86_64"  # Default AMI type
   
-  # Add additional configurations as needed
   tags = {
     "karpenter.sh/discovery" = var.cluster_name
   }
