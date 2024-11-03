@@ -78,36 +78,84 @@ you can have options
 
 ![alt text](<Screenshot 2024-09-07 at 17.35.13.png>)
 
-# goto the EKS console After a successful workflow Apply action and click on create access to the user this will take you to where you attach the following policy  
-1. AmazonEKSClusterPolicy
-2. AmazonEKSWorkerNodePolicy
-3. AmazonEKSServicePolicy
-4. AmazonEKS_CNI_Policy
-## Create Namespace and RBAC for application 
-# Access cluster from any cli where AWScli is installed and configured to the account and region or you can use AWS cloudshell of the region.
+# Regtech EKS Infrastructure with Graviton and Karpenter
 
-1. confirm that your cluster is active 
-    Run `aws eks describe-cluster --region <your region> --name <cluster-name> --query "cluster.status"`
-2. to connect to cluster and carry out kubectl commands
-    Run `aws eks update-kubeconfig --region <your region> --name <cluster-name>`
-3. to enable access to the cluster
-    Run 
-    ```
-    aws eks update-cluster-config \
-    --region <your region> \
-    --name <cluster-name> \
-    --resources-vpc-config endpointPublicAccess=true,endpointPrivateAccess=true
-    ```
+This infrastructure can be deployed in two ways:
+1. From a VM/PC
+2. From GitHub Actions workflow (recommended)
 
-# Create Namespace, Service Account, Role & Assign that role
-    ```
-    Run kubectl create ns <your-namespace>
-    ```
-# For the yaml codes below, copy and create the file.yml and Run with `kubectl apply -f file.yml`
+## Quick Start - VM/PC Deployment
 
-# Creating Service Account
+### Prerequisites
+- AWS CLI installed and configured
+- kubectl installed
+- Terraform installed
+- An AWS account with appropriate permissions
 
+### Installation Steps
 
+1. Install AWS CLI:
+```
+https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html
+```
+
+2. Install Terraform:
+```
+https://developer.hashicorp.com/terraform/tutorials/aws-get-started/install-cli
+```
+
+3. Clone and Configure:
+```bash
+# Clone repository
+git clone <repository-url>
+
+# Initialize Terraform
+terraform init
+
+# Format and validate
+terraform fmt
+terraform validate
+
+# Deploy infrastructure
+AWS_ACCESS_KEY_ID=YOUR_ACCESS_KEY AWS_SECRET_ACCESS_KEY=YOUR_SECRET_KEY terraform apply
+```
+
+## GitHub Actions Deployment
+
+1. Fork the repository
+2. Create GitHub secrets:
+   - `AWS_ACCESS_KEY_ID`
+   - `AWS_SECRET_ACCESS_KEY`
+3. Edit Terraform files if needed
+4. Push changes to main branch
+5. Use Actions tab to deploy
+
+## Post-Deployment Setup
+
+### Connect to Cluster
+```bash
+# Verify cluster status
+aws eks describe-cluster --region <your-region> --name <cluster-name> --query "cluster.status"
+
+# Configure kubectl
+aws eks update-kubeconfig --region <your-region> --name <cluster-name>
+
+# Enable public/private access
+aws eks update-cluster-config \
+  --region <your-region> \
+  --name <cluster-name> \
+  --resources-vpc-config endpointPublicAccess=true,endpointPrivateAccess=true
+```
+
+### Create Namespace and RBAC
+```bash
+# Create namespace
+kubectl create ns <your-namespace>
+```
+
+Create the following YAML files and apply them:
+
+1. Service Account:
 ```yaml
 apiVersion: v1
 kind: ServiceAccount
@@ -116,9 +164,7 @@ metadata:
   namespace: <your-namespace>
 ```
 
-### Create Role 
-
-
+2. Role:
 ```yaml
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
@@ -137,48 +183,131 @@ rules:
     resources:
       - pods
       - secrets
-      - componentstatuses
-      - configmaps
-      - daemonsets
-      - deployments
-      - events
-      - endpoints
-      - horizontalpodautoscalers
-      - ingress
-      - jobs
-      - limitranges
-      - namespaces
-      - nodes
-      - pods
-      - persistentvolumes
-      - persistentvolumeclaims
-      - resourcequotas
-      - replicasets
-      - replicationcontrollers
-      - serviceaccounts
-      - services
+      # [other resources as in original]
     verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
 ```
 
-### Bind the role to service account
-
-
+3. Role Binding:
 ```yaml
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
 metadata:
   name: app-rolebinding
-  namespace: <your-namespace> 
+  namespace: <your-namespace>
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: Role
-  name: app-role 
+  name: app-role
 subjects:
-- namespace: webapps 
+- namespace: webapps
   kind: ServiceAccount
-  name: <name-of-app> 
+  name: <name-of-app>
 ```
 
-## Now the infrastructre and name space is ready to recieve the app!!!
-## We heard over to the CICD pipleline to deploy a sample game app to this infrastructure.
-# EKS-Graviton-Karpenter
+## Testing Karpenter with Graviton
+
+### Deploy Test Application
+```bash
+cat <<EOF | kubectl apply -f -
+apiVersion: apps/v1
+kind: Deployment
+name: graviton-test
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: graviton-test
+  template:
+    metadata:
+      labels:
+        app: graviton-test
+    spec:
+      nodeSelector:
+        kubernetes.io/arch: arm64
+      containers:
+      - name: nginx
+        image: nginx:latest
+        resources:
+          requests:
+            cpu: "500m"
+            memory: "512Mi"
+          limits:
+            cpu: "1000m"
+            memory: "1Gi"
+EOF
+```
+
+### Monitor Deployment
+```bash
+# Watch nodes
+kubectl get nodes -w
+
+# Check Karpenter logs
+kubectl logs -n karpenter -l app.kubernetes.io/name=karpenter -f
+
+# Check pods
+kubectl get pods -o wide
+```
+
+### Scaling Test
+```bash
+# Scale deployment
+kubectl scale deployment graviton-test --replicas=10
+
+# Watch node provisioning
+kubectl get nodes -w
+```
+
+## Karpenter Configuration
+
+Configured Graviton instance types:
+- t4g.small
+- t4g.medium
+- c6g.large
+- m6g.large
+
+Settings:
+- Architecture: arm64 (Graviton)
+- Capacity types: spot and on-demand
+- Resource limits:
+  - CPU: 100
+  - Memory: 100Gi
+
+## Troubleshooting
+
+1. Check Karpenter status:
+```bash
+kubectl get all -n karpenter
+```
+
+2. View logs:
+```bash
+kubectl logs -n karpenter -l app.kubernetes.io/name=karpenter -f
+```
+
+3. Check events:
+```bash
+kubectl get events --sort-by='.metadata.creationTimestamp'
+```
+
+## Cleanup
+
+1. Remove test deployment:
+```bash
+kubectl delete deployment graviton-test
+```
+
+2. Destroy infrastructure:
+```bash
+AWS_ACCESS_KEY_ID=YOUR_ACCESS_KEY AWS_SECRET_ACCESS_KEY=YOUR_SECRET_KEY terraform destroy
+```
+
+## Security Considerations
+
+- Regularly rotate AWS credentials
+- Monitor node access patterns
+- Review Karpenter logs
+- Keep Karpenter and EKS versions updated
+- Follow AWS security best practices
+
+The infrastructure is now ready to receive applications! Proceed to the CICD pipeline to deploy your applications to this infrastructure.
