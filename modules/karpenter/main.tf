@@ -23,11 +23,23 @@ resource "aws_iam_role" "karpenter_node" {
       }
     ]
   })
+
+lifecycle {
+    create_before_destroy = false
+  }
+
 }
+
+
 
 resource "aws_iam_instance_profile" "karpenter" {
   name = "KarpenterNodeInstanceProfile-${var.cluster_name}-${local.name_suffix}"
   role = aws_iam_role.karpenter_node.name
+  lifecycle {
+    create_before_destroy = false
+  }
+
+  depends_on = [aws_iam_role.karpenter_node]
 }
 
 resource "aws_iam_policy" "karpenter_controller" {
@@ -86,6 +98,11 @@ spec:
     name: default
   ttlSecondsAfterEmpty: 30
 YAML
+
+lifecycle {
+    create_before_destroy = false
+  }
+
 }
 
 # Karpenter Node Template
@@ -123,6 +140,11 @@ spec:
 
     --BOUNDARY--
 YAML
+
+lifecycle {
+    create_before_destroy = false
+  }
+
 }
 
 # Attach required policies to karpenter node role

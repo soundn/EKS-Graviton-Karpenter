@@ -11,6 +11,9 @@ resource "aws_security_group" "cluster_sg" {
   tags = {
     Name = "ken-cluster-sg"
   }
+  lifecycle {
+    create_before_destroy = false
+  }
 }
 
 resource "aws_security_group" "node_sg" {
@@ -33,6 +36,10 @@ resource "aws_security_group" "node_sg" {
   tags = {
     Name = "ken-node-sg"
   }
+
+  lifecycle {
+    create_before_destroy = false
+  }
 }
 
 resource "aws_eks_cluster" "main" {
@@ -43,6 +50,15 @@ resource "aws_eks_cluster" "main" {
     subnet_ids         = var.subnet_ids
     security_group_ids = [aws_security_group.cluster_sg.id]
   }
+
+  lifecycle {
+    create_before_destroy = false
+  }
+
+  depends_on = [
+    aws_security_group.cluster_sg,
+    aws_security_group.node_sg
+  ]
 }
 
 resource "aws_eks_node_group" "main" {
