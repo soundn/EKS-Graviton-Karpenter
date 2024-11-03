@@ -3,4 +3,6 @@ variable "vpc_id" {}
 variable "subnet_ids" {}
 variable "cluster_role_arn" {}
 variable "node_group_role_arn" {}
-variable "ssh_key_name" {}
+variable "ssh_key_name" {
+  default = "ken.pem"
+}
