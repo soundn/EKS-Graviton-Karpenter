@@ -311,3 +311,5 @@ AWS_ACCESS_KEY_ID=YOUR_ACCESS_KEY AWS_SECRET_ACCESS_KEY=YOUR_SECRET_KEY terrafor
 - Follow AWS security best practices
 
 The infrastructure is now ready to receive applications! Proceed to the CICD pipeline to deploy your applications to this infrastructure.
+
+<!-- Security scan triggered at 2025-09-02 03:42:45 -->
